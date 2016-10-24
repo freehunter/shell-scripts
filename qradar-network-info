@@ -1,0 +1,134 @@
+con work script
+
+#!/bin/bash
+#Author: Mark Hunt (mark.hunt@us.ibm.com)
+#Configuration Worksheet Information Getter Thing
+#conwork.sh
+
+#are we on the console?
+#if so, copy the script to every other server
+while read line
+ do
+ console=$( echo $line | cut -d "'" -f 2 )
+ if [[ $console ]]
+  then
+    #echo is_console: $console
+    while read line
+     do
+       other_hosts=$( echo $line | cut -d " " -f 1 )
+        if [[ $other_hosts != "127.0.0.1" ]]
+         then
+          echo Copying script to $other_hosts
+          scp conwork.sh $other_hosts:/root
+        fi
+     done <<< "`cat /etc/hosts`"
+ fi
+done <<< "`/opt/qradar/bin/myver -v | grep "Console: 'true'"`"
+#find hostname
+while read line
+do
+   echo Hostname: $line
+done <<< "`hostname`"
+
+#find appliance type
+while read line
+do
+ appliance=$( echo $line | cut -d "'" -f 2 )
+ echo Appliance type: $appliance
+done <<< "`/opt/qradar/bin/myver -v | grep "Appliance"`"
+
+#find serial number
+while read line
+do
+ echo Serial number: $line
+done <<< "`/opt/qradar/bin/getserial`"
+
+#find version number
+while read line
+do
+ version=$( echo $line | cut -d "\"" -f 2 )
+ echo QRadar Version: $version
+done <<< "`/opt/qradar/bin/getHostVersion.sh | grep qradarVersion`"
+
+
+#find server IP
+while read line
+do
+ hostip=$( echo $line | cut -d "'" -f 2 )
+ echo IP Address: $hostip
+done <<< "`/opt/qradar/bin/myver -v | grep "IP address"`"
+
+#find netmask
+while read line
+do
+ value=$( echo $line | grep $hostip )
+ if [[ $value ]]
+  then
+   netmask=$( echo $line | cut -d " " -f 4 )
+   echo $netmask
+ fi
+done <<< "`ifconfig | grep Mask:`"
+
+#find default gateway
+while read line
+do
+ value=$( echo $line | cut -d " " -f 2 )
+ if [[ $value ]]
+  then
+   gateway1=$( echo $line | cut -d " " -f 2 )
+   #gateway2=$( echo $gateway1 | grep "10" )
+    if [[ $gateway1 ]]
+     then
+       echo Gateway: $gateway1
+    fi
+ fi
+done <<< "`route -n | grep UG`"
+
+#find DNS servers
+
+while read line
+do
+ value=$( echo $line | grep "nameserver" )
+ if [[ $value ]]
+  then
+   nameserver=$( echo $line | cut -d " " -f 2 )
+   echo DNS: $nameserver
+ fi
+done <<< "`cat /etc/resolv.conf | grep nameserver`"
+
+#find IMM information
+echo Please wait for IMM connection...
+while read line
+do
+ value=$( echo $line | grep "IMM.HostIPAddress1" )
+ if [[ $value ]]
+  then
+   IMMIP=$( echo $line | cut -d "=" -f 2 )
+   echo IMM IP: $IMMIP
+ fi
+value=$( echo $line | grep "IMM.GatewayIPAddress1" )
+ if [[ $value ]]
+  then
+   IMMGatewayIP=$( echo $line | cut -d "=" -f 2 )
+   echo IMM Gateway IP: $IMMGatewayIP
+ fi
+
+done <<< "`/opt/ibm/toolscenter/asu/asu64 show`"
+
+#give us some breathing room
+echo ""
+echo "----------------"
+
+#run it on all the other machines now
+while read line
+ do
+ console=$( echo $line | cut -d "'" -f 2 )
+ if [[ $console ]]
+  then
+   echo Please wait while we run on the other servers
+   echo "-----------------"
+   echo ""
+   /opt/qradar/support/all_servers.sh /root/conwork.sh
+ fi
+done <<< "`/opt/qradar/bin/myver -v | grep "Console: 'true'"`"
+
